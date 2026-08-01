@@ -4,7 +4,7 @@ import {
 } from "./firebase.js";
 
 const ROOMMATES = ["Niraj Kumar", "Vivekananda", "Aniket Gupta"];
-
+// JJust testing the git a[proach
 // ─── User Access Code System ──────────────────────────────────────────────────
 // Each roommate has a private access code. The room is always the same shared
 // Firestore collection; only permissions change per user.
