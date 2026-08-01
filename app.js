@@ -19,7 +19,90 @@ const CODE_VERIFIED_KEY   = "flatsplit.userCodeVerified"; // "true" when logged 
 const DEVICE_STORAGE_KEY  = "flatsplit.deviceId";         // kept for legacy compat
 const OWNER_STORAGE_KEY   = "flatsplit.ownerName";        // kept for legacy compat
 const THEME_STORAGE_KEY   = "flatsplit.theme";
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;  // 5 MB hard cap on raw file selection
+const MAX_UPLOAD_BYTES = 1 * 1024 * 1024;  // target after compression (≈1 MB)
+const MAX_IMAGE_PX    = 1600;              // maximum dimension after resize
+
+/**
+ * Compress an image File using an off-screen canvas.
+ * Resizes so neither dimension exceeds MAX_IMAGE_PX, then encodes as JPEG
+ * at decreasing quality until the blob fits within MAX_UPLOAD_BYTES.
+ * Returns a Blob ready for Firebase Storage upload.
+ */
+async function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // Calculate target dimensions, preserving aspect ratio
+      let { naturalWidth: w, naturalHeight: h } = img;
+      if (w > MAX_IMAGE_PX || h > MAX_IMAGE_PX) {
+        const ratio = Math.min(MAX_IMAGE_PX / w, MAX_IMAGE_PX / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      // Try progressively lower quality until we hit the size budget
+      let quality = 0.85;
+      const tryEncode = () => {
+        canvas.toBlob((blob) => {
+          if (!blob) { reject(new Error("Canvas toBlob failed")); return; }
+          if (blob.size <= MAX_UPLOAD_BYTES || quality <= 0.3) {
+            resolve(blob);
+          } else {
+            quality = Math.max(quality - 0.1, 0.3);
+            tryEncode();
+          }
+        }, "image/jpeg", quality);
+      };
+      tryEncode();
+    };
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = url;
+  });
+}
+
+/**
+ * Upload an image file to Firebase Storage under expenses/
+ * Returns the public download URL.
+ * @param {File} file
+ * @param {(pct: number) => void} onProgress  - called with 0–100
+ */
+async function uploadExpenseImage(file, onProgress) {
+  // Compress first
+  onProgress(5);
+  const blob = await compressImage(file);
+  onProgress(20);
+  // Build a unique storage path: expenses/<timestamp>-<random>.<ext>
+  const ext  = file.type === "image/webp" ? "webp" : "jpg";
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const storageRef = ref(storage, `expenses/${name}`);
+  // uploadBytes doesn't give byte-level progress, so we simulate 20→80 during the call
+  const midTimer = setInterval(() => {
+    onProgress(Math.min(79, (onProgress._pct || 20) + 12));
+  }, 300);
+  // Patch onProgress so the interval can read the last reported value
+  const originalOnProgress = onProgress;
+  let _pct = 20;
+  onProgress = (pct) => { _pct = pct; originalOnProgress(pct); };
+  onProgress._pct = _pct;
+  try {
+    const snapshot = await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+    clearInterval(midTimer);
+    originalOnProgress(90);
+    const url = await getDownloadURL(snapshot.ref);
+    originalOnProgress(100);
+    return url;
+  } catch (err) {
+    clearInterval(midTimer);
+    throw err;
+  }
+}
+
 const CATEGORY_META = {
   Groceries: ["🛒", "#3d9b70"], "Rent & Utilities": ["⌂", "#5960cf"], "Food & Dining": ["🍜", "#dc7552"],
   Transport: ["⌁", "#347dc4"], Household: ["⌘", "#a66ac5"], Entertainment: ["✦", "#d28c37"], Other: ["•", "#75809b"]
@@ -122,7 +205,14 @@ function expenseRow(item, mode) {
     actions = `<button type="button" data-action="edit" aria-label="Edit expense"${owner ? "" : lockedTitle}>✎</button>` +
               `<button type="button" class="delete${owner ? "" : " btn-disabled"}" data-action="soft-delete" aria-label="Move expense to trash"${owner ? "" : ` title="You can only modify your own expenses."`}>×</button>`;
   }
-  return `<article class="expense-row ${mode === "trash" ? "trash-row" : ""}" data-id="${item.id}"><div class="category-icon" style="--cat:${color}">${icon}</div><div class="expense-main"><strong>${escapeHTML(item.itemName)}</strong><small>${escapeHTML(item.note || item.category || "Other")}</small></div><div class="expense-meta">${formattedDate(item.date)}</div><div class="expense-payer"><small>Paid by</small><b>${escapeHTML(item.paidBy)}</b></div><div class="expense-amount">${money(item.amount)}</div><div class="row-actions">${actions}</div></article>`;
+  // Thumbnail: shown to all users if imageUrl exists; clicking opens full-screen viewer
+  const thumb = item.imageUrl
+    ? `<button type="button" class="thumb-btn" data-action="view-image" aria-label="View receipt image" title="View receipt">
+         <img class="expense-thumb" src="${escapeHTML(item.imageUrl)}" alt="Receipt" loading="lazy"
+              onerror="this.onerror=null;this.parentElement.innerHTML='<span class=thumb-err aria-label=Image\ failed>🖼️</span>'" />
+       </button>`
+    : "";
+  return `<article class="expense-row ${mode === "trash" ? "trash-row" : ""}${item.imageUrl ? " has-thumb" : ""}" data-id="${item.id}">${thumb}<div class="category-icon" style="--cat:${color}">${icon}</div><div class="expense-main"><strong>${escapeHTML(item.itemName)}</strong><small>${escapeHTML(item.note || item.category || "Other")}</small></div><div class="expense-meta">${formattedDate(item.date)}</div><div class="expense-payer"><small>Paid by</small><b>${escapeHTML(item.paidBy)}</b></div><div class="expense-amount">${money(item.amount)}</div><div class="row-actions">${actions}</div></article>`;
 }
 function renderDashboard() {
   const allCurrent = dashboardExpenses(); const expenses = filteredDashboardExpenses(); const balances = calculateBalances(expenses);
@@ -132,12 +222,48 @@ function renderDashboard() {
 
 function setPage(page) { document.querySelectorAll(".page-panel").forEach((panel) => panel.classList.toggle("is-active", panel.id === `${page}Page`)); document.querySelectorAll(".nav-link").forEach((button) => button.classList.toggle("is-active", button.dataset.page === page)); if (page === "history") renderHistory(); if (page === "analytics") renderAnalytics(); if (page === "trash") renderTrash(); window.scrollTo({ top: 0, behavior: "smooth" }); }
 function setModal(modal, open) { modal.classList.toggle("is-open", open); modal.setAttribute("aria-hidden", String(!open)); document.body.style.overflow = open ? "hidden" : ""; }
-function clearExpenseForm() { elements.form.reset(); $("#expenseId").value = ""; $("#expenseDate").value = todayISO(); $("#expenseCategory").value = "Groceries"; elements.formError.textContent = ""; }
-function openExpense(item) { if (!isConfigured || !state.roomCode) { toast("Join a room and configure Firebase first.", true); return; } clearExpenseForm(); if (item) { $("#expenseModalTitle").textContent = "Edit expense"; $("#saveExpense").textContent = "Save changes"; $("#expenseId").value = item.id; $("#expenseDate").value = item.date; $("#paidBy").value = item.paidBy; $("#itemName").value = item.itemName; $("#expenseCategory").value = item.category; $("#expenseAmount").value = item.amount; $("#expenseNote").value = item.note || ""; } else { $("#expenseModalTitle").textContent = "Add expense"; $("#saveExpense").textContent = "Save expense"; } setModal(elements.expenseModal, true); setTimeout(() => $("#itemName").focus(), 50); }
+function clearExpenseForm() {
+  elements.form.reset();
+  $("#expenseId").value = "";
+  $("#expenseDate").value = todayISO();
+  $("#expenseCategory").value = "Groceries";
+  elements.formError.textContent = "";
+  elements.imageHint.textContent = "No image selected";
+  elements.imageHint.className = "image-hint";
+  // Also clear any existing imageUrl preview that was set when editing
+  $("#currentImageUrl").value = "";
+}
+function openExpense(item) {
+  if (!isConfigured || !state.roomCode) { toast("Join a room and configure Firebase first.", true); return; }
+  clearExpenseForm();
+  if (item) {
+    $("#expenseModalTitle").textContent = "Edit expense";
+    $("#saveExpense").textContent = "Save changes";
+    $("#expenseId").value = item.id;
+    $("#expenseDate").value = item.date;
+    $("#paidBy").value = item.paidBy;
+    $("#itemName").value = item.itemName;
+    $("#expenseCategory").value = item.category;
+    $("#expenseAmount").value = item.amount;
+    $("#expenseNote").value = item.note || "";
+    // Preserve existing imageUrl when editing so we don't overwrite it
+    if (item.imageUrl) {
+      $("#currentImageUrl").value = item.imageUrl;
+      elements.imageHint.textContent = "✅ Image already uploaded";
+      elements.imageHint.className = "image-hint image-hint--ok";
+    }
+  } else {
+    $("#expenseModalTitle").textContent = "Add expense";
+    $("#saveExpense").textContent = "Save expense";
+  }
+  setModal(elements.expenseModal, true);
+  setTimeout(() => $("#itemName").focus(), 50);
+}
 
 async function saveExpense(event) {
   event.preventDefault();
-  const id = $("#expenseId").value;
+  const id        = $("#expenseId").value;
+  const imageFile = elements.imageInput.files?.[0] || null;
   const data = {
     date:     $("#expenseDate").value,
     paidBy:   $("#paidBy").value,
@@ -150,28 +276,57 @@ async function saveExpense(event) {
     elements.formError.textContent = "Enter a date, item name, and an amount greater than zero.";
     return;
   }
+  // Reject files that are too large before even trying to compress
+  if (imageFile && imageFile.size > MAX_IMAGE_BYTES) {
+    elements.formError.textContent = "Image is too large (max 5 MB). Please choose a smaller file.";
+    return;
+  }
+
   const button = $("#saveExpense");
   button.disabled = true;
+
+  // ── Step 1: upload image to Firebase Storage (if a new file was chosen) ────
+  let imageUrl = $("#currentImageUrl").value || null; // keep existing url when editing
+  if (imageFile && storage) {
+    button.textContent = "Uploading image… 0%";
+    try {
+      imageUrl = await uploadExpenseImage(imageFile, (pct) => {
+        button.textContent = `Uploading… ${pct}%`;
+      });
+    } catch (uploadErr) {
+      console.error("Image upload failed:", uploadErr);
+      elements.formError.textContent = "Image upload failed. Please try again.";
+      button.disabled = false;
+      button.textContent = id ? "Save changes" : "Save expense";
+      return;
+    }
+  }
+
+  // ── Step 2: save/update the Firestore document ────────────────────────────
   button.textContent = "Saving…";
   try {
     if (id) {
-      // Edit: only update the mutable fields — ownership fields are never changed.
-      await updateDoc(doc(expenseRef(), id), { ...data, id, updatedAt: serverTimestamp() });
+      // Edit: only update mutable fields. If a new image was uploaded, update imageUrl too.
+      const updatePayload = { ...data, id, updatedAt: serverTimestamp() };
+      if (imageUrl) updatePayload.imageUrl = imageUrl;
+      await updateDoc(doc(expenseRef(), id), updatePayload);
     } else {
-      // New expense: stamp the creator's name and private code for ownership checks.
+      // New expense: stamp creator info and save imageUrl if present.
       const newDoc = doc(expenseRef());
-      await setDoc(newDoc, {
-        id:          newDoc.id,
+      const payload = {
+        id:           newDoc.id,
         ...data,
-        createdBy:   state.currentUser,  // display name, e.g. "Niraj Kumar"
-        ownerCode:   state.userCode,      // private code, e.g. "flat246"
-        createdAt:   serverTimestamp(),
-        updatedAt:   serverTimestamp(),
-        deleted:     false,
-        deletedAt:   null,
-        archived:    false,
+        createdBy:    state.currentUser,
+        ownerCode:    state.userCode,
+        createdAt:    serverTimestamp(),
+        updatedAt:    serverTimestamp(),
+        deleted:      false,
+        deletedAt:    null,
+        archived:     false,
         archiveMonth: null,
-      });
+      };
+      if (imageUrl) payload.imageUrl = imageUrl;  // only set when an image was uploaded
+      await setDoc(newDoc, payload);
     }
     setModal(elements.expenseModal, false);
     toast(id ? "Expense updated." : "Expense added for the room.");
@@ -218,7 +373,18 @@ async function archiveExpenseBatch(expenses) {
 }
 async function closeCurrentMonth() { const expenses = dashboardExpenses(); if (!expenses.length) return; const button = $("#confirmArchive"); button.disabled = true; button.textContent = "Closing…"; try { await archiveExpenseBatch(expenses); setModal(elements.archiveModal, false); toast(`${monthLabel(currentMonth())} is safely archived.`); } catch (error) { elements.archiveError.textContent = friendlyError(error); } finally { button.disabled = false; button.textContent = "Close month"; } }
 
-function normaliseExpense(snapshot) { const data = snapshot.data(); return { ...data, id: data.id || snapshot.id, deleted: Boolean(data.deleted), archived: Boolean(data.archived), archiveMonth: data.archiveMonth || null, note: data.note || "" }; }
+function normaliseExpense(snapshot) {
+  const data = snapshot.data();
+  return {
+    ...data,
+    id:           data.id || snapshot.id,
+    deleted:      Boolean(data.deleted),
+    archived:     Boolean(data.archived),
+    archiveMonth: data.archiveMonth || null,
+    note:         data.note || "",
+    imageUrl:     data.imageUrl || null,  // pass through download URL for display
+  };
+}
 function startListener() { state.unsubscribe?.(); if (!isConfigured) { setStatus("Firebase setup required", "error"); return; } setStatus(navigator.onLine ? "Connecting" : "Offline", navigator.onLine ? "loading" : "error"); state.unsubscribe = onSnapshot(query(expenseRef(), orderBy("date", "desc")), (snapshot) => { state.expenses = snapshot.docs.map(normaliseExpense); setStatus("Live updates on"); renderDashboard(); renderHistory(); renderAnalytics(); renderTrash(); }, (error) => { console.error(error); setStatus("Connection error", "error"); toast(friendlyError(error), true); }); }
 /**
  * Enter the shared room with the given authenticated user.
@@ -328,7 +494,58 @@ function bindEvents() {
     if (action === "permanent") permanentlyDelete(id);
   });
   elements.archiveMonths.addEventListener("click", (event) => { const month = event.target.closest("[data-month]")?.dataset.month; if (month) { state.selectedArchive = month; renderHistory(); elements.archiveDetail.scrollIntoView({ behavior: "smooth", block: "start" }); } }); elements.archiveDetail.addEventListener("click", (event) => { if (event.target.closest("#closeArchiveDetail")) { state.selectedArchive = ""; renderHistory(); } });
-  document.addEventListener("click", (event) => { if (event.target.closest("[data-close-modal]")) setModal(elements.expenseModal, false); if (event.target.closest("[data-close-archive]")) setModal(elements.archiveModal, false); }); document.addEventListener("keydown", (event) => { if (event.key === "Escape") { setModal(elements.expenseModal, false); setModal(elements.archiveModal, false); } }); window.addEventListener("offline", () => setStatus("Offline", "error")); window.addEventListener("online", () => { if (state.roomCode) startListener(); }); window.addEventListener("beforeunload", () => state.unsubscribe?.());
+
+  // ── Image viewer: open modal when clicking a receipt thumbnail ─────────────
+  function openImageModal(url) {
+    elements.previewImage.src = url;
+    elements.previewImage.alt = "Expense receipt preview";
+    setModal(elements.imageModal, true);
+  }
+  function closeImageModal() {
+    setModal(elements.imageModal, false);
+    // Delay src clear so the close animation completes
+    setTimeout(() => { elements.previewImage.src = ""; }, 250);
+  }
+  // Delegate thumbnail clicks from both expense list and trash list
+  [elements.list, elements.trash].forEach((container) => {
+    container.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-action='view-image']");
+      if (!btn) return;
+      const id   = btn.closest(".expense-row")?.dataset.id;
+      const item = id ? state.expenses.find((e) => e.id === id) : null;
+      if (item?.imageUrl) openImageModal(item.imageUrl);
+    });
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-modal]"))  setModal(elements.expenseModal, false);
+    if (event.target.closest("[data-close-archive]")) setModal(elements.archiveModal, false);
+    if (event.target.closest("[data-close-image]"))  closeImageModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setModal(elements.expenseModal, false);
+      setModal(elements.archiveModal, false);
+      closeImageModal();
+    }
+  });
+
+  // ── File input: show selected filename and validate size ───────────────────
+  elements.imageInput.addEventListener("change", () => {
+    const file = elements.imageInput.files?.[0];
+    if (!file) { elements.imageHint.textContent = "No image selected"; elements.imageHint.className = "image-hint"; return; }
+    if (file.size > MAX_IMAGE_BYTES) {
+      elements.imageHint.textContent = "File too large (max 5 MB)";
+      elements.imageHint.className = "image-hint image-hint--error";
+      elements.imageInput.value = "";
+      return;
+    }
+    elements.imageHint.textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+    elements.imageHint.className = "image-hint image-hint--ok";
+  });
+
+  window.addEventListener("offline", () => setStatus("Offline", "error"));
+  window.addEventListener("online", () => { if (state.roomCode) startListener(); });
+  window.addEventListener("beforeunload", () => state.unsubscribe?.());
 }
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
