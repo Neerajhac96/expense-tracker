@@ -7,9 +7,6 @@ import {
   addDoc, collection, deleteDoc, doc, getDocs, getFirestore, onSnapshot,
   orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import {
-  deleteObject, getDownloadURL, getStorage, ref, uploadBytes
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA5bO7f27PauNlDVNBF_uSA4W6KaNgyUBQ",
@@ -23,10 +20,8 @@ const firebaseConfig = {
 const isConfigured = !Object.values(firebaseConfig).some((value) => value.includes("PASTE_YOUR"));
 const app = isConfigured ? initializeApp(firebaseConfig) : null;
 const db = app ? getFirestore(app) : null;
-const storage = app ? getStorage(app) : null;
 
 export {
-  db, storage, isConfigured, addDoc, collection, deleteDoc, doc, getDocs, onSnapshot,
-  orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
-  deleteObject, getDownloadURL, ref, uploadBytes
+  db, isConfigured, addDoc, collection, deleteDoc, doc, getDocs, onSnapshot,
+  orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch
 };
