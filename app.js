@@ -15,6 +15,7 @@ const USER_CODES = {
 };
 const HARDCODED_ROOM_CODE = "flat123";  // single shared room — never changes
 const USER_STORAGE_KEY    = "flatsplit.currentUser";      // stores display name
+const ROOM_STORAGE_KEY    = "flatsplit.currentRoom";       // always "flat123"
 const CODE_VERIFIED_KEY   = "flatsplit.userCodeVerified"; // "true" when logged in
 const DEVICE_STORAGE_KEY  = "flatsplit.deviceId";         // kept for legacy compat
 const OWNER_STORAGE_KEY   = "flatsplit.ownerName";        // kept for legacy compat
@@ -58,7 +59,12 @@ function money(value) { return new Intl.NumberFormat("en-IN", { style: "currency
 function toCents(value) { return Math.round((Number(value) || 0) * 100); }
 function fromCents(value) { return value / 100; }
 function escapeHTML(value = "") { const node = document.createElement("span"); node.textContent = String(value); return node.innerHTML; }
-function expenseRef() { return collection(db, "rooms", state.roomCode, "expenses"); }
+function expenseRef() {
+  const room = state.roomCode
+    || localStorage.getItem(ROOM_STORAGE_KEY)
+    || HARDCODED_ROOM_CODE;
+  return collection(db, "rooms", room, "expenses");
+}
 /**
  * Returns true when the currently logged-in user is the creator of this expense.
  * Ownership is determined by matching the stored ownerCode on the expense document
@@ -265,6 +271,8 @@ function enterRoom(userName) {
   state.roomCode    = HARDCODED_ROOM_CODE;
   state.currentUser = userName;
   state.userCode    = USER_CODES[userName] || "";
+  // Persist the room so Firestore queries survive a page refresh.
+  localStorage.setItem(ROOM_STORAGE_KEY, HARDCODED_ROOM_CODE);
   elements.joinScreen.classList.add("is-hidden");
   elements.app.classList.remove("is-hidden");
   elements.roomName.textContent    = roomTitle();
@@ -286,6 +294,7 @@ function logout() {
   state.selectedArchive = "";
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(CODE_VERIFIED_KEY);
+  localStorage.removeItem(ROOM_STORAGE_KEY);
   elements.app.classList.add("is-hidden");
   elements.joinScreen.classList.remove("is-hidden");
   // Reset form
@@ -326,6 +335,7 @@ function login(event) {
   // Persist session so the user is auto-logged in on next visit
   localStorage.setItem(USER_STORAGE_KEY, name);
   localStorage.setItem(CODE_VERIFIED_KEY, "true");
+  localStorage.setItem(ROOM_STORAGE_KEY, HARDCODED_ROOM_CODE);
   enterRoom(name);
 }
 
@@ -390,6 +400,10 @@ initialiseTheme();
 const savedUser     = localStorage.getItem(USER_STORAGE_KEY);
 const codeVerified  = localStorage.getItem(CODE_VERIFIED_KEY);
 if (savedUser && codeVerified === "true" && USER_CODES[savedUser]) {
+  // Restore the room key if it was lost (e.g. cleared by an older code path).
+  if (!localStorage.getItem(ROOM_STORAGE_KEY)) {
+    localStorage.setItem(ROOM_STORAGE_KEY, HARDCODED_ROOM_CODE);
+  }
   enterRoom(savedUser);
 } else {
   // No valid session — show the login screen
