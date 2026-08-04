@@ -4,13 +4,19 @@ A modern expense sharing application for roommates built with **HTML, CSS, JavaS
 
 FlatSplit helps roommates track shared expenses, calculate spending, view analytics, manage monthly history, and synchronize data in real time.
 
+## 🏠 **DASHBOARD**
 
 <img width="897" height="1018" alt="image" src="https://github.com/user-attachments/assets/c9729591-1725-4135-b200-0070e5ef42bf" />
 
+## 🕒 **HISTORY**
+
 <img width="1073" height="977" alt="image" src="https://github.com/user-attachments/assets/1d32c0ef-53ca-42b7-88cd-72c57803759c" />
 
+## 📊 **ANALYTICS**
 
 <img width="1051" height="991" alt="image" src="https://github.com/user-attachments/assets/28e9cbbb-ab09-460a-be0c-7f4162328214" />
+
+## 🗑️ **TRASH BIN**
 
 <img width="1092" height="432" alt="image" src="https://github.com/user-attachments/assets/9a5f0633-1f5d-41c6-a5fb-9d3f383df8b0" />
 
@@ -110,7 +116,7 @@ Run using Live Server.
 GitHub Pages
 
 ```
-https://neerajhac96.github.io/expense-tracker/
+
 ```
 
 ---
