@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0B1220" />
+    <title>FlatSplit — Offline</title>
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: dark; }
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #0B1220;
+        color: #F9FAFB;
+        font: 400 16px/1.6 system-ui, -apple-system, sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .card {
+        width: min(420px, 100%);
+        background: #1F2937;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 20px;
+        padding: 40px 36px;
+        text-align: center;
+        animation: up .4s cubic-bezier(.22,.68,0,1.2) both;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        background: #6366F1;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 24px;
+        font-size: 32px;
+        box-shadow: 0 8px 24px rgba(99,102,241,.35);
+      }
+      h1 { margin: 0 0 10px; font-size: 26px; letter-spacing: -.4px; }
+      p  { color: #94A3B8; margin: 0 0 28px; font-size: 15px; }
+      button {
+        background: #6366F1;
+        color: #fff;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 28px;
+        font: 700 15px system-ui;
+        cursor: pointer;
+        transition: background .15s, transform .15s;
+        box-shadow: 0 8px 24px rgba(99,102,241,.3);
+      }
+      button:hover  { background: #5254cc; transform: translateY(-1px); }
+      button:active { transform: translateY(0) scale(.98); }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(239,68,68,.12);
+        border: 1px solid rgba(239,68,68,.3);
+        color: #EF4444;
+        border-radius: 99px;
+        padding: 4px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 24px;
+      }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: #EF4444; }
+      @keyframes up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">₹</div>
+      <div class="badge"><span class="dot"></span> No connection</div>
+      <h1>You're offline</h1>
+      <p>FlatSplit needs an internet connection to sync expenses with your flatmates. Connect to Wi-Fi or mobile data and try again.</p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </body>
+</html>

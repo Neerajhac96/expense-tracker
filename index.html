@@ -1,83 +1,433 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── Primary Meta ──────────────────────────────────────────────────────── -->
+    <title>FlatSplit | Roommate Expense Tracker</title>
+    <meta name="description" content="Split shared expenses with your flatmates in real time. Track bills, settle payments, and archive monthly records — all synced live with Firebase." />
+    <meta name="application-name" content="FlatSplit" />
+    <meta name="author" content="FlatSplit" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- ── Theme & PWA ────────────────────────────────────────────────────────── -->
+    <meta name="theme-color" content="#0B1220" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>FlatSplit | Roommate Expenses</title>
+    <meta name="apple-mobile-web-app-title" content="FlatSplit" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="msapplication-TileColor" content="#6366F1" />
+    <meta name="msapplication-config" content="none" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ── Open Graph ─────────────────────────────────────────────────────────── -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content="FlatSplit | Roommate Expense Tracker" />
+    <meta property="og:description" content="Split shared expenses with your flatmates in real time." />
+    <meta property="og:image"       content="icons/icon-512.png" />
+    <meta property="og:locale"      content="en_IN" />
+
+    <!-- ── Manifest ───────────────────────────────────────────────────────────── -->
     <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="icons/icon.svg" />
+
+    <!-- ── Favicons & Icons ───────────────────────────────────────────────────── -->
+    <link rel="icon"             href="icons/favicon.svg"         type="image/svg+xml" />
+    <link rel="icon"             href="icons/icon-192.png"        type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" sizes="180x180" />
+
+    <!-- ── Fonts (preconnect before stylesheet for LCP) ──────────────────────── -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preload"
+          as="style"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@500;600;700&display=swap" />
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@500;600;700&display=swap" />
+
+    <!-- ── App Stylesheet ─────────────────────────────────────────────────────── -->
     <link rel="stylesheet" href="style.css" />
   </head>
+
   <body>
+
+    <!-- ── SW Update Banner (hidden until new SW activates) ─────────────────── -->
+    <div id="updateBanner" class="update-banner" role="status" aria-live="polite" hidden>
+      <span>⚡ A new version of FlatSplit is available.</span>
+      <button id="updateNow" type="button">Update now</button>
+      <button id="updateDismiss" type="button" aria-label="Dismiss update">✕</button>
+    </div>
+
+    <!-- ── Login Screen ───────────────────────────────────────────────────────── -->
     <section id="joinScreen" class="join-screen" aria-labelledby="joinTitle">
       <div class="join-card">
         <a class="brand" href="#" aria-label="FlatSplit home"><span class="brand-mark">₹</span><span>Flat<span>Split</span></span></a>
         <p class="eyebrow">SHARED HOME, SIMPLIFIED</p>
         <h1 id="joinTitle">Welcome back</h1>
         <p>Select your name and enter your private access code to continue.</p>
-        <form id="joinForm" class="join-form">
-          <label for="ownerNameInput">Your name<select id="ownerNameInput" required><option value="">Select your name</option><option value="Niraj Kumar">Niraj Kumar</option><option value="Aniket Gupta">Aniket Gupta</option><option value="Vivekananda">Vivekananda</option></select></label>
-          <label for="accessCodeInput">Access Code<input id="accessCodeInput" type="password" maxlength="16" autocomplete="current-password" placeholder="Enter your access code" required /></label>
+        <form id="joinForm" class="join-form" novalidate>
+          <label for="ownerNameInput">Your name
+            <select id="ownerNameInput" required autocomplete="name">
+              <option value="">Select your name</option>
+              <option value="Niraj Kumar">Niraj Kumar</option>
+              <option value="Aniket Gupta">Aniket Gupta</option>
+              <option value="Vivekananda">Vivekananda</option>
+            </select>
+          </label>
+          <label for="accessCodeInput">Access Code
+            <input id="accessCodeInput" type="password" maxlength="16"
+                   autocomplete="current-password" placeholder="Enter your access code" required />
+          </label>
           <p id="joinError" class="form-error" role="alert"></p>
-          <button class="button button-primary" type="submit">Login <span>→</span></button>
+          <button class="button button-primary" type="submit">Login <span aria-hidden="true">→</span></button>
         </form>
         <small>Each roommate has their own private access code. Do not share it.</small>
       </div>
     </section>
 
+    <!-- ── App Shell ──────────────────────────────────────────────────────────── -->
     <div id="appShell" class="app-shell is-hidden">
+
       <header class="topbar">
-        <a class="brand" href="#dashboard" data-page-link="dashboard" aria-label="FlatSplit dashboard"><span class="brand-mark">₹</span><span>Flat<span>Split</span></span></a>
+        <a class="brand" href="#dashboard" data-page-link="dashboard" aria-label="FlatSplit dashboard">
+          <span class="brand-mark" aria-hidden="true">₹</span><span>Flat<span>Split</span></span>
+        </a>
+
         <nav class="main-nav" aria-label="Main navigation">
           <button class="nav-link is-active" type="button" data-page="dashboard">Dashboard</button>
           <button class="nav-link" type="button" data-page="history">History</button>
           <button class="nav-link" type="button" data-page="analytics">Analytics</button>
           <button class="nav-link" type="button" data-page="trash">Trash</button>
         </nav>
+
         <div class="topbar-actions">
-          <span id="connectionStatus" class="connection-status is-loading"><i></i> Connecting</span>
-          <button id="themeToggle" class="header-icon-button" type="button" aria-label="Toggle color theme" aria-pressed="false">◐</button>
-          <button id="installButton" class="header-icon-button is-hidden" type="button">Install</button>
-          <button id="addExpenseTop" class="button button-primary button-compact" type="button">+ Add expense</button>
+          <span id="connectionStatus" class="connection-status is-loading" aria-live="polite" aria-label="Connection status">
+            <i aria-hidden="true"></i> Connecting
+          </span>
+          <button id="installButton" class="button button-ghost button-compact is-hidden" type="button"
+                  aria-label="Install FlatSplit as an app">Install app</button>
+          <button id="addExpenseTop" class="button button-primary button-compact" type="button"
+                  aria-label="Add a new expense">+ Add expense</button>
           <button id="logoutButton" class="logout-button" type="button">Logout</button>
         </div>
       </header>
 
-      <main class="page-content">
-        <section id="dashboardPage" class="page-panel is-active">
-          <section class="hero" id="top"><div><p class="eyebrow">CURRENT MONTH · <span id="dashboardMonth"></span></p><h1>Clear bills, happier <em>home.</em></h1><p class="hero-copy"><span id="roomName">Flat 002</span> · live roommate expenses.</p></div><button id="addExpenseHero" class="button button-primary add-hero" type="button"><span>+</span> Add an expense</button></section>
-          <section class="summary-grid" aria-label="Expense summary"><article class="stat-card total-card"><div class="stat-icon">₹</div><div><p>Total expenses</p><h2 id="totalExpense">₹0.00</h2><span id="selectedExpenseHint">No expenses yet</span></div></article><article class="stat-card"><div class="stat-icon muted-icon">#</div><div><p>Expense count</p><h2 id="expenseCount">0</h2><span>this month</span></div></article><article class="stat-card share-card"><div class="stat-icon muted-icon">÷</div><div><p>Per person share</p><h2 id="perPersonShare">₹0.00</h2><span>split equally by 3</span></div></article></section>
-          <section class="section-heading"><div><p class="eyebrow">AT A GLANCE</p><h2>Who paid what</h2></div></section><section id="peopleSummary" class="people-grid" aria-live="polite"></section>
-          <section class="settlement-panel"><div class="settlement-title"><div><p class="eyebrow">SETTLE UP</p><h2>Minimum transfers</h2><p id="settlementSubtitle">Everything is even. Nice!</p></div><button id="copyReport" class="button button-secondary" type="button">Copy WhatsApp report</button></div><div id="settlementList" class="settlement-list"></div></section>
-          <section class="history-section"><div class="section-heading history-heading"><div><p class="eyebrow">ACTIVITY</p><h2>Current month expenses</h2></div><button id="exportCsv" class="text-button" type="button">Export CSV <span>↓</span></button></div><div class="filters" aria-label="Expense filters"><label class="search-field"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search item or note..." /></label><label class="select-field"><span>Category</span><select id="categoryFilter"><option value="">All categories</option><option>Groceries</option><option>Rent &amp; Utilities</option><option>Food &amp; Dining</option><option>Transport</option><option>Household</option><option>Entertainment</option><option>Other</option></select></label><label class="date-field"><span>From</span><input id="dateFrom" type="date" /></label><label class="date-field"><span>To</span><input id="dateTo" type="date" /></label><button id="clearFilters" class="clear-button" type="button">Clear</button></div><div id="expenseList" class="expense-list" aria-live="polite"></div></section>
+      <main class="page-content" id="mainContent">
+
+        <!-- Dashboard ─────────────────────────────────────────────────────────── -->
+        <section id="dashboardPage" class="page-panel is-active" aria-labelledby="dashboardHeading">
+          <section class="hero" id="top">
+            <div>
+              <p class="eyebrow">CURRENT MONTH · <span id="dashboardMonth"></span></p>
+              <h1 id="dashboardHeading">Clear bills, happier <em>home.</em></h1>
+              <p class="hero-copy"><span id="roomName">Flat 123</span> · live roommate expenses.</p>
+            </div>
+            <button id="addExpenseHero" class="button button-primary add-hero" type="button"
+                    aria-label="Add a new shared expense">
+              <span aria-hidden="true">+</span> Add an expense
+            </button>
+          </section>
+
+          <section class="summary-grid" aria-label="Expense summary">
+            <article class="stat-card total-card">
+              <div class="stat-icon" aria-hidden="true">₹</div>
+              <div>
+                <p>Total expenses</p>
+                <h2 id="totalExpense">₹0.00</h2>
+                <span id="selectedExpenseHint">No expenses yet</span>
+              </div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-icon muted-icon" aria-hidden="true">#</div>
+              <div>
+                <p>Expense count</p>
+                <h2 id="expenseCount">0</h2>
+                <span>this month</span>
+              </div>
+            </article>
+            <article class="stat-card share-card">
+              <div class="stat-icon muted-icon" aria-hidden="true">÷</div>
+              <div>
+                <p>Per person share</p>
+                <h2 id="perPersonShare">₹0.00</h2>
+                <span>split equally by 3</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="section-heading">
+            <div><p class="eyebrow">AT A GLANCE</p><h2>Who paid what</h2></div>
+          </section>
+          <section id="peopleSummary" class="people-grid" aria-live="polite" aria-label="Roommate balances"></section>
+
+          <section class="settlement-panel" aria-label="Settlement summary">
+            <div class="settlement-title">
+              <div>
+                <p class="eyebrow">SETTLE UP</p>
+                <h2>Minimum transfers</h2>
+                <p id="settlementSubtitle">Everything is even. Nice!</p>
+              </div>
+              <button id="copyReport" class="button button-secondary" type="button">Copy WhatsApp report</button>
+            </div>
+            <div id="settlementList" class="settlement-list" aria-live="polite"></div>
+          </section>
+
+          <section class="history-section" aria-label="Current month expenses">
+            <div class="section-heading history-heading">
+              <div><p class="eyebrow">ACTIVITY</p><h2>Current month expenses</h2></div>
+              <button id="exportCsv" class="text-button" type="button">Export CSV <span aria-hidden="true">↓</span></button>
+            </div>
+            <div class="filters" role="search" aria-label="Expense filters">
+              <label class="search-field">
+                <span aria-hidden="true">⌕</span>
+                <input id="searchInput" type="search" placeholder="Search item or note..." aria-label="Search expenses" />
+              </label>
+              <label class="select-field">
+                <span>Category</span>
+                <select id="categoryFilter" aria-label="Filter by category">
+                  <option value="">All categories</option>
+                  <option>Groceries</option>
+                  <option>Rent &amp; Utilities</option>
+                  <option>Food &amp; Dining</option>
+                  <option>Transport</option>
+                  <option>Household</option>
+                  <option>Entertainment</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <label class="date-field">
+                <span>From</span>
+                <input id="dateFrom" type="date" aria-label="Filter from date" />
+              </label>
+              <label class="date-field">
+                <span>To</span>
+                <input id="dateTo" type="date" aria-label="Filter to date" />
+              </label>
+              <button id="clearFilters" class="clear-button" type="button" aria-label="Clear all filters">Clear</button>
+            </div>
+            <div id="expenseList" class="expense-list" aria-live="polite" aria-label="Expense list"></div>
+          </section>
         </section>
 
-        <section id="historyPage" class="page-panel">
-          <div class="subpage-hero"><p class="eyebrow">MONTHLY ARCHIVE</p><h1>Past months, <em>preserved.</em></h1><p>Choose a closed month to review its complete read-only breakdown.</p></div>
-          <div id="archiveMonthList" class="archive-month-list"></div>
-          <section id="archiveDetail" class="archive-detail is-hidden" aria-live="polite"></section>
+        <!-- History ───────────────────────────────────────────────────────────── -->
+        <section id="historyPage" class="page-panel" aria-labelledby="historyHeading">
+          <div class="subpage-hero">
+            <p class="eyebrow">MONTHLY ARCHIVE</p>
+            <h1 id="historyHeading">Past months, <em>preserved.</em></h1>
+            <p>Choose a closed month to review its complete read-only breakdown.</p>
+          </div>
+          <div id="archiveMonthList" class="archive-month-list" role="list" aria-label="Archived months"></div>
+          <section id="archiveDetail" class="archive-detail is-hidden" aria-live="polite" aria-label="Archive detail"></section>
         </section>
 
-        <section id="analyticsPage" class="page-panel">
-          <div class="subpage-hero"><p class="eyebrow">LIVE INSIGHTS</p><h1>Spend smarter <em>together.</em></h1><p>Analytics include all active and archived room expenses, excluding the trash.</p></div>
-          <section id="analyticsStats" class="analytics-stats"></section>
-          <section class="analytics-grid"><article class="analytics-card trend-card"><div class="card-title"><h2>Monthly expense trend</h2><span>All time</span></div><div id="trendChart" class="trend-chart"></div></article><article class="analytics-card"><div class="card-title"><h2>Category split</h2><span>All time</span></div><div id="categoryChart" class="category-chart"></div></article><article class="analytics-card"><div class="card-title"><h2>Person-wise spending</h2><span>All time</span></div><div id="personChart" class="bar-chart"></div></article><article class="analytics-card"><div class="card-title"><h2>Top categories</h2><span>All time</span></div><div id="topCategories" class="ranked-list"></div></article></section>
+        <!-- Analytics ─────────────────────────────────────────────────────────── -->
+        <section id="analyticsPage" class="page-panel" aria-labelledby="analyticsHeading">
+          <div class="subpage-hero">
+            <p class="eyebrow">LIVE INSIGHTS</p>
+            <h1 id="analyticsHeading">Spend smarter <em>together.</em></h1>
+            <p>Analytics include all active and archived room expenses, excluding the trash.</p>
+          </div>
+          <section id="analyticsStats" class="analytics-stats" aria-label="Analytics summary"></section>
+          <section class="analytics-grid" aria-label="Expense charts">
+            <article class="analytics-card trend-card">
+              <div class="card-title"><h2>Monthly expense trend</h2><span>All time</span></div>
+              <div id="trendChart" class="trend-chart" role="img" aria-label="Monthly trend chart"></div>
+            </article>
+            <article class="analytics-card">
+              <div class="card-title"><h2>Category split</h2><span>All time</span></div>
+              <div id="categoryChart" class="category-chart" role="img" aria-label="Category breakdown chart"></div>
+            </article>
+            <article class="analytics-card">
+              <div class="card-title"><h2>Person-wise spending</h2><span>All time</span></div>
+              <div id="personChart" class="bar-chart" role="img" aria-label="Per-person spending chart"></div>
+            </article>
+            <article class="analytics-card">
+              <div class="card-title"><h2>Top categories</h2><span>All time</span></div>
+              <div id="topCategories" class="ranked-list" aria-label="Top spending categories"></div>
+            </article>
+          </section>
         </section>
 
-        <section id="trashPage" class="page-panel"><div class="subpage-hero"><p class="eyebrow">RECOVERY BIN</p><h1>Trash, not <em>gone.</em></h1><p>Restore an expense to its previous state, or remove it permanently.</p></div><div id="trashList" class="expense-list" aria-live="polite"></div></section>
+        <!-- Trash ─────────────────────────────────────────────────────────────── -->
+        <section id="trashPage" class="page-panel" aria-labelledby="trashHeading">
+          <div class="subpage-hero">
+            <p class="eyebrow">RECOVERY BIN</p>
+            <h1 id="trashHeading">Trash, not <em>gone.</em></h1>
+            <p>Restore an expense to its previous state, or remove it permanently.</p>
+          </div>
+          <div id="trashList" class="expense-list" aria-live="polite" aria-label="Deleted expenses"></div>
+        </section>
+
       </main>
-      <footer><span id="footerRoom">Shared in Flat 002</span><button id="closeMonth" type="button">Close current month</button></footer>
+
+      <footer>
+        <span id="footerRoom">Shared in Flat 123</span>
+        <button id="closeMonth" type="button">Close current month</button>
+      </footer>
     </div>
 
-    <div id="expenseModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="expenseModalTitle"><div class="modal-backdrop" data-close-modal></div><div class="modal-card"><div class="modal-header"><div><p class="eyebrow">EXPENSE DETAILS</p><h2 id="expenseModalTitle">Add expense</h2></div><button class="icon-button" type="button" data-close-modal aria-label="Close">×</button></div><form id="expenseForm"><input id="expenseId" type="hidden" /><div class="form-grid"><label>Date<input id="expenseDate" type="date" required /></label><label>Paid by<select id="paidBy" required><option value="Niraj Kumar">Niraj Kumar</option><option value="Vivekananda">Vivekananda</option><option value="Aniket Gupta">Aniket Gupta</option></select></label><label class="wide">Item name<input id="itemName" type="text" maxlength="80" placeholder="e.g. Weekly groceries" required /></label><label>Category<select id="expenseCategory" required><option>Groceries</option><option>Rent &amp; Utilities</option><option>Food &amp; Dining</option><option>Transport</option><option>Household</option><option>Entertainment</option><option>Other</option></select></label><label>Amount (₹)<input id="expenseAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required /></label><label class="wide">Note <span class="optional">optional</span><textarea id="expenseNote" maxlength="240" rows="3" placeholder="Add a helpful detail..."></textarea></label></div><p id="formError" class="form-error" role="alert"></p><div class="modal-actions"><button type="button" class="button button-ghost" data-close-modal>Cancel</button><button id="saveExpense" class="button button-primary" type="submit">Save expense</button></div></form></div></div>
-    <div id="archiveModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="archiveModalTitle"><div class="modal-backdrop" data-close-archive></div><div class="modal-card small-modal"><div class="modal-header"><div><p class="eyebrow">CLOSE CURRENT MONTH</p><h2 id="archiveModalTitle">Archive <span id="archiveMonthLabel"></span>?</h2></div><button class="icon-button" type="button" data-close-archive aria-label="Close">×</button></div><p class="modal-copy">This keeps every expense safely in History and starts a clean dashboard next month. Nothing is deleted.</p><p id="archiveError" class="form-error" role="alert"></p><div class="modal-actions"><button class="button button-ghost" type="button" data-close-archive>Cancel</button><button id="confirmArchive" class="button button-primary" type="button">Close month</button></div></div></div>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <!-- ── Add / Edit Expense Modal ───────────────────────────────────────────── -->
+    <div id="expenseModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+         aria-labelledby="expenseModalTitle">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">EXPENSE DETAILS</p>
+            <h2 id="expenseModalTitle">Add expense</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-modal aria-label="Close dialog">×</button>
+        </div>
+        <form id="expenseForm" novalidate>
+          <input id="expenseId" type="hidden" />
+          <div class="form-grid">
+            <label>Date<input id="expenseDate" type="date" required autocomplete="off" /></label>
+            <label>Paid by
+              <select id="paidBy" required>
+                <option value="Niraj Kumar">Niraj Kumar</option>
+                <option value="Vivekananda">Vivekananda</option>
+                <option value="Aniket Gupta">Aniket Gupta</option>
+              </select>
+            </label>
+            <label class="wide">Item name
+              <input id="itemName" type="text" maxlength="80"
+                     placeholder="e.g. Weekly groceries" required autocomplete="off" />
+            </label>
+            <label>Category
+              <select id="expenseCategory" required>
+                <option>Groceries</option>
+                <option>Rent &amp; Utilities</option>
+                <option>Food &amp; Dining</option>
+                <option>Transport</option>
+                <option>Household</option>
+                <option>Entertainment</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <label>Amount (₹)
+              <input id="expenseAmount" type="number" min="0.01" step="0.01"
+                     inputmode="decimal" placeholder="0.00" required autocomplete="off" />
+            </label>
+            <label class="wide">Note <span class="optional">optional</span>
+              <textarea id="expenseNote" maxlength="240" rows="3"
+                        placeholder="Add a helpful detail..."></textarea>
+            </label>
+          </div>
+          <p id="formError" class="form-error" role="alert"></p>
+          <div class="modal-actions">
+            <button type="button" class="button button-ghost" data-close-modal>Cancel</button>
+            <button id="saveExpense" class="button button-primary" type="submit">Save expense</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Archive Month Confirmation Modal ───────────────────────────────────── -->
+    <div id="archiveModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+         aria-labelledby="archiveModalTitle">
+      <div class="modal-backdrop" data-close-archive></div>
+      <div class="modal-card small-modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">CLOSE CURRENT MONTH</p>
+            <h2 id="archiveModalTitle">Archive <span id="archiveMonthLabel"></span>?</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-archive aria-label="Close dialog">×</button>
+        </div>
+        <p class="modal-copy">
+          This keeps every expense safely in History and starts a clean dashboard next month. Nothing is deleted.
+        </p>
+        <p id="archiveError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="button button-ghost" type="button" data-close-archive>Cancel</button>
+          <button id="confirmArchive" class="button button-primary" type="button">Close month</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Toast Notification ─────────────────────────────────────────────────── -->
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- ── App entry point ────────────────────────────────────────────────────── -->
     <script type="module" src="app.js"></script>
+
+    <!-- ── Service Worker Registration + Update Detection ────────────────────── -->
+    <script>
+      (function registerSW() {
+        if (!("serviceWorker" in navigator)) return;
+
+        let pendingWorker = null;
+
+        function showUpdateBanner() {
+          const banner = document.getElementById("updateBanner");
+          if (banner) banner.hidden = false;
+        }
+
+        function applyUpdate() {
+          if (pendingWorker) {
+            pendingWorker.postMessage({ type: "SKIP_WAITING" });
+          }
+        }
+
+        // Wire up banner buttons immediately (DOM is ready at this point)
+        document.getElementById("updateNow")?.addEventListener("click", function () {
+          applyUpdate();
+        });
+        document.getElementById("updateDismiss")?.addEventListener("click", function () {
+          const banner = document.getElementById("updateBanner");
+          if (banner) banner.hidden = true;
+        });
+
+        // Listen for SW messages (SW_ACTIVATED = new version took control)
+        navigator.serviceWorker.addEventListener("message", function (event) {
+          if (event.data?.type === "SW_ACTIVATED") {
+            // A new SW has just activated — offer a refresh
+            showUpdateBanner();
+          }
+        });
+
+        // Reload the page when the SW changes (user clicked "Update now")
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          if (!document.getElementById("updateBanner")?.hidden) {
+            window.location.reload();
+          }
+        });
+
+        window.addEventListener("load", function () {
+          navigator.serviceWorker
+            .register("./service-worker.js", { scope: "./" })
+            .then(function (registration) {
+              // Check for an already-waiting worker on initial registration
+              if (registration.waiting) {
+                pendingWorker = registration.waiting;
+                showUpdateBanner();
+              }
+
+              // Watch for a newly-installed worker that's waiting
+              registration.addEventListener("updatefound", function () {
+                const worker = registration.installing;
+                if (!worker) return;
+                worker.addEventListener("statechange", function () {
+                  if (worker.state === "installed" && navigator.serviceWorker.controller) {
+                    // New SW installed & waiting; old SW still controls the page
+                    pendingWorker = worker;
+                    showUpdateBanner();
+                  }
+                });
+              });
+
+              // Poll for updates every 30 min while the tab is open
+              setInterval(function () {
+                registration.update().catch(function () {});
+              }, 30 * 60 * 1000);
+            })
+            .catch(function (err) {
+              console.warn("Service Worker registration failed:", err);
+            });
+        });
+      })();
+    </script>
+
   </body>
 </html>
