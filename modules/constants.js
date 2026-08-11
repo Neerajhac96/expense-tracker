@@ -57,13 +57,13 @@ export const STORAGE_KEYS = {
  * Format: { categoryName: [emoji, hexColor] }
  */
 export const CATEGORY_META = {
-  Groceries:          ["🛒", "#3d9b70"],
-  "Rent & Utilities": ["⌂",  "#5960cf"],
-  "Food & Dining":    ["🍜", "#dc7552"],
-  Transport:          ["⌁",  "#347dc4"],
-  Household:          ["⌘",  "#a66ac5"],
-  Entertainment:      ["✦",  "#d28c37"],
-  Other:              ["•",  "#75809b"],
+  Groceries:          ["🛒", "#6FA97C"],
+  "Rent & Utilities": ["⌂",  "#4D8FB0"],
+  "Food & Dining":    ["🍜", "#C1503F"],
+  Transport:          ["⌁",  "#5B7FA6"],
+  Household:          ["⌘",  "#9B6FA0"],
+  Entertainment:      ["✦",  "#E1A03D"],
+  Other:              ["•",  "#7A6F5E"],
 };
 
 /**
@@ -71,7 +71,7 @@ export const CATEGORY_META = {
  * Index must stay in sync with ROOMMATES.
  */
 export const PEOPLE_META = [
-  { color: "#5746d6", bg: "#eeecff", initials: "NK" },
-  { color: "#168064", bg: "#e8f8f1", initials: "V"  },
-  { color: "#d17537", bg: "#fff1e7", initials: "AG" },
+  { color: "#E1A03D", bg: "#2B2216", initials: "NK" },
+  { color: "#6FA97C", bg: "#1C2620", initials: "V"  },
+  { color: "#C1503F", bg: "#291B16", initials: "AG" },
 ];
