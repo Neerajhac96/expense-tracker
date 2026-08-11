@@ -442,7 +442,7 @@ h1, h2, h3, h4 {
   line-height: 1;
   pointer-events: none;
 }
-.total-card p, .total-card span { color: rgba(21,19,15,.62); }
+.total-card p, .total-card span { color: rgba(21,19,15,.72); font-weight: 600; }
 .total-card h2 { color: var(--primary-ink); }
 
 .stat-icon {
@@ -456,7 +456,7 @@ h1, h2, h3, h4 {
   border: 1px dashed rgba(21,19,15,.28);
   flex-shrink: 0;
 }
-.muted-icon { color: var(--primary); background: var(--primary-dim); border: 1px dashed rgba(225,160,61,.35); }
+.muted-icon { color: var(--primary); background: rgba(225,160,61,.14); border: 1.5px solid rgba(225,160,61,.55); font-weight: 700; }
 
 .stat-card p  { margin: 0 0 2px; font-size: 12.5px; color: var(--text-3); }
 .stat-card h2 { margin: 0; font-size: 27px; line-height: 1.15; font-weight: 600; }
